@@ -82,18 +82,106 @@ controller.on('rtm_close', function (bot) {
 // BEGIN EDITING HERE!
 
 controller.on('bot_channel_join', function (bot, message) {
+   bot.api.reactions.add({
+       timestamp: message.ts,
+       channel: message.channel,
+       name: 'robot_face',
+   }, function (err) {
+       if (err) {
+           console.log(err)
+       }
+       bot.reply(message, "I'm in!");
+   });
+});
+
+
+controller.on('message.im', handleMessage);
+controller.on('message.groups', handleMessage);
+controller.on('message.channels', handleMessage);
+
+
+function handleMessage(bot, message) {
     bot.reply(message, "I'm here!")
+}
+
+
+controller.hears(['hello', 'hi', 'hey', 'yo'], 'direct_message', function (bot, message) {
+    bot.reply(message, 'hey');
 });
 
-controller.hears('hello', 'direct_message', function (bot, message) {
-    bot.reply(message, 'Hello!');
-});
 
-
+let tfsRegexp = /((tfs)|\#)(\d{5,})/ig;
 /**
  * AN example of what could be:
  * Any un-handled direct mention gets a reaction and a pat response!
  */
+//direct_message,mention,direct_mention,
+controller.on('ambient', function (bot, message) {
+    const references = message.text.match(tfsRegexp);
+    if (references) {
+        const newText = message.text.replace(tfsRegexp, stripAndGenerateLink);
+        let links = "";
+        references.forEach((reference) => {
+            links += stripAndGenerateLink(reference)+", ";
+        });
+        links = links.substr(0, links.length-2);
+        bot.api.chat.postMessage({
+            channel: message.channel,
+            attachments: [
+                {
+                    "text":links
+                }
+            ]
+        }, function (err) {
+            if (err) {
+                console.log(err);
+                bot.reply(message, 'Found a ticket number but I couldn\'t link it: '+err);
+            }
+        });
+    }
+});
+
+controller.on('direct_message,mention,direct_mention', function (bot, message) {
+    bot.reply(message, "If I see something that looks like a TFS item i'll try and make a link for it.");
+});
+
+function stripAndGenerateLink(mixed) {
+    const numberOnly = mixed.match(/\d+/)[0];
+    return "<"+numberToLink(numberOnly)+"|#"+ numberOnly+">";
+}
+
+
+function numberToLink(ticketNumber) {
+    return "https://tfs.deltek.com/tfs/Deltek/Maconomy/_workitems?id="+ticketNumber;
+}
+
+// //direct_message,mention,direct_mention,
+// controller.on('ambient', function (bot, message) {
+//     const references = message.text.match(tfsRegexp);
+//     if (references) {
+//         const newText = message.text.replace(tfsRegexp, stripAndGenerateLink);
+//         bot.api.chat.update({
+//             ts: message.ts,
+//             channel: message.channel,
+//             text: newText
+//         }, function (err) {
+//             if (err) {
+//                 console.log(err)
+//                 bot.reply(message, 'Found a ticket number but I couldn\'t link it: '+err);
+//             }
+//         });
+//         // let links = "";
+//         // references.forEach((reference) => {
+//         //     let issueNumber = numberOnly(reference);
+//         //     links += "<"+numberToLink(issueNumber)+"|#"+ issueNumber+">, ";
+//         // });
+//         // links = links.substr(0, links.length-2);
+//         // bot.reply(message, links);
+//     }
+// });
+
+
+
 //controller.on('direct_message,mention,direct_mention', function (bot, message) {
 //    bot.api.reactions.add({
 //        timestamp: message.ts,
