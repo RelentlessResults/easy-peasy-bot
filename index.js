@@ -110,7 +110,7 @@ controller.hears(['hello', 'hi', 'hey', 'yo'], 'direct_message', function (bot, 
 });
 
 
-let tfsRegexp = /((tfs)|\#)(\d{5,})/ig;
+const tfsRegexp = /((tfs)|\#)(\d{5,})/ig;
 /**
  * AN example of what could be:
  * Any un-handled direct mention gets a reaction and a pat response!
