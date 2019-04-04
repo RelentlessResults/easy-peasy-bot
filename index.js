@@ -52,7 +52,7 @@ if (process.env.TOKEN || process.env.SLACK_TOKEN) {
     var app = require('./lib/apps');
     var controller = app.configure(process.env.APP_PORT, process.env.CLIENT_ID, process.env.CLIENT_SECRET, config, onInstallation);
 } else {
-    console.log('Error: If this is a custom integration, please specify TOKEN in the environment. If this is an app, please specify CLIENTID, CLIENTSECRET, and PORT in the environment');
+    console.log('Error: If this is a custom integration, please specify TOKEN in the environment. If this is an app, please specify CLIENT_ID, CLIENT_SECRET, and APP_PORT in the environment');
     process.exit(1);
 }
 
@@ -110,39 +110,36 @@ controller.hears(['hello', 'hi', 'hey', 'yo'], 'direct_message', function (bot, 
 });
 
 
-const tfsRegexp = /((tfs)|\#)(\d{5,})/ig;
+const tfsRegexp = /((tfs)|\#|- )(\d{6,})/ig;
 /**
  * AN example of what could be:
  * Any un-handled direct mention gets a reaction and a pat response!
  */
 //direct_message,mention,direct_mention,
-controller.on('ambient', function (bot, message) {
-    const references = message.text.match(tfsRegexp);
+controller.on('ambient,bot_message', function (bot, message) {
+    let inputText = message.text;
+    if (message.subtype == 'bot_message') {
+        if (message.username == bot.identity.name) {
+            return;
+        }
+        if (message.hasOwnProperty("attachments")) {
+            inputText += " "+message.attachments.map((attachment) => attachment.text);
+        }
+    }
+    let references = inputText.match(tfsRegexp);
+
     if (references) {
-        const newText = message.text.replace(tfsRegexp, stripAndGenerateLink);
-        let links = "";
-        references.forEach((reference) => {
-            links += stripAndGenerateLink(reference)+", ";
-        });
-        links = links.substr(0, links.length-2);
-        bot.api.chat.postMessage({
-            channel: message.channel,
-            attachments: [
-                {
-                    "text":links
-                }
-            ]
-        }, function (err) {
-            if (err) {
-                console.log(err);
-                bot.reply(message, 'Found a ticket number but I couldn\'t link it: '+err);
-            }
-        });
+        processReferences(references, bot, message);
     }
 });
 
 controller.on('direct_message,mention,direct_mention', function (bot, message) {
-    bot.reply(message, "If I see something that looks like a TFS item i'll try and make a link for it.");
+    let references = message.text.match(tfsRegexp);
+    if (references) {
+        processReferences(references, bot, message);
+    } else {
+        bot.reply(message, "If I see something that looks like a TFS item i'll try and make a link for it.");
+    }
 });
 
 function stripAndGenerateLink(mixed) {
@@ -153,6 +150,26 @@ function stripAndGenerateLink(mixed) {
 
 function numberToLink(ticketNumber) {
     return "https://tfs.deltek.com/tfs/Deltek/Maconomy/_workitems?id="+ticketNumber;
+}
+
+function processReferences(references, bot, message) {
+    let links = references
+        .map(reference => stripAndGenerateLink(reference))
+        .filter((v, i, a)=>a.indexOf(v) === i)
+        .join(", ");
+    bot.api.chat.postMessage({
+        channel: message.channel,
+        attachments: [
+            {
+                "text":links
+            }
+        ]
+    }, function (err) {
+        if (err) {
+            console.log(err);
+            bot.reply(message, 'Found a ticket number but I couldn\'t link it: '+err);
+        }
+    });
 }
 
 // //direct_message,mention,direct_mention,
